@@ -14,20 +14,22 @@ from optimizers import get_optimizer, LR_Scheduler
 from linear_eval import main as linear_eval
 from datetime import datetime
 import wandb
+from custom_loader import create_dataloader
 
 def main(device, args):
     DEBUG = False
-    wandb.init(project="SimSiamRight", name='normalization_changed', config=args, mode='disabled' if DEBUG else 'online')
+    wandb.init(project="SimSiamRight", name='custom_train_set', config=args, mode='disabled' if DEBUG else 'online')
 
-    train_loader = torch.utils.data.DataLoader(
-        dataset=get_dataset(
-            transform=get_aug(train=True, **args.aug_kwargs), 
-            train=True,
-            **args.dataset_kwargs),
-        shuffle=True,
+    train_loader = create_dataloader(
+        h5_path="new_cifar10_dataset.h5",
         batch_size=args.train.batch_size,
-        **args.dataloader_kwargs
+        shuffle=True,
+        transform=get_aug(train=True, image_size=args.aug_kwargs['image_size'], name='simsiam_diffusion'),
+        augment_images=True,
+        num_workers=8,
+        range_of_images=[0, 0] #Set as -1 to use all synthetic images. 
     )
+
     memory_loader = torch.utils.data.DataLoader(
         dataset=get_dataset(
             transform=get_aug(train=False, train_classifier=False, **args.aug_kwargs), 
@@ -62,7 +64,7 @@ def main(device, args):
         optimizer,
         args.train.warmup_epochs, args.train.warmup_lr*args.train.batch_size/256, 
         args.train.num_epochs, args.train.base_lr*args.train.batch_size/256, args.train.final_lr*args.train.batch_size/256, 
-        len(train_loader),
+        len(train_loader) // 5,
         constant_predictor_lr=True # see the end of section 4.2 predictor
     )
 

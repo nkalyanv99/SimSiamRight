@@ -5,3 +5,4 @@ logs/
 *.cpython*
 wandb*
 *.out
+*.h5
