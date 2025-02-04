@@ -1,0 +1,6 @@
+
+SimSiam/__pycache__/
+Data/
+logs/
+*.cpython*
+wandb*
