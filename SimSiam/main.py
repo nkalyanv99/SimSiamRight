@@ -15,10 +15,26 @@ from linear_eval import main as linear_eval
 from datetime import datetime
 import wandb
 from custom_loader import create_dataloader
+import random
+
+def set_seed(seed):
+    """Set all random seeds for reproducibility"""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def main(device, args):
+    # Set random seed first thing in main
+    set_seed(args.seed if hasattr(args, 'seed') else 42)
+    
     DEBUG = False
-    wandb.init(project="SimSiamRight", name='custom_train_set', config=args, mode='disabled' if DEBUG else 'online')
+    wandb.init(project="SimSiamRight", name='condition_label', config=args, mode='disabled' if DEBUG else 'online')
+
+    label_range = [0, 0]
+    args.model.name = 'simsiam_diffusion'
 
     train_loader = create_dataloader(
         h5_path="new_cifar10_dataset.h5",
@@ -27,7 +43,7 @@ def main(device, args):
         transform=get_aug(train=True, image_size=args.aug_kwargs['image_size'], name='simsiam_diffusion'),
         augment_images=True,
         num_workers=8,
-        range_of_images=[0, 0] #Set as -1 to use all synthetic images. 
+        range_of_images=label_range #Set as -1 to use all synthetic images. 
     )
 
     memory_loader = torch.utils.data.DataLoader(
@@ -70,15 +86,15 @@ def main(device, args):
 
     accuracy = 0 
     # Start training
-    global_progress = tqdm(range(0, args.train.stop_at_epoch), desc=f'Training')
+    global_progress = tqdm(range(0, args.train.stop_at_epoch // 5), desc=f'Training')
     for epoch in global_progress:
         model.train()
         
         local_progress=tqdm(train_loader, desc=f'Epoch {epoch}/{args.train.num_epochs}', disable=args.hide_progress)
         for idx, ((images1, images2), labels) in enumerate(local_progress):
-
+            labels = labels / (label_range[1] + 1) #Normalize labels to be between 0 and 1. 
             model.zero_grad()
-            data_dict = model.forward(images1.to(device, non_blocking=True), images2.to(device, non_blocking=True))
+            data_dict = model.forward(images1.to(device, non_blocking=True), images2.to(device, non_blocking=True), labels.to(device, non_blocking=True))
             loss = data_dict['loss'].mean() # ddp
             loss.backward()
             optimizer.step()
