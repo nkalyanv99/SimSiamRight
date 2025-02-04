@@ -16,8 +16,8 @@ from datetime import datetime
 import wandb
 
 def main(device, args):
-
-    wandb.init(project="SimSiamRight", name='original', config=args)
+    DEBUG = False
+    wandb.init(project="SimSiamRight", name='normalization_changed', config=args, mode='disabled' if DEBUG else 'online')
 
     train_loader = torch.utils.data.DataLoader(
         dataset=get_dataset(

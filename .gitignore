@@ -4,3 +4,4 @@ Data/
 logs/
 *.cpython*
 wandb*
+*.out
