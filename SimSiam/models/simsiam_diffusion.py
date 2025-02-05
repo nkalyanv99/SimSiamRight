@@ -104,7 +104,9 @@ class SimSiamDiffusion(nn.Module):
         f, h = self.encoder, self.predictor
         z1, z2 = f(x1), f(x2)
         p1, p2 = h(z1, label), h(z2, label)
-        L = D(p1, z2) / 2 + D(p2, z1) / 2
+        # L = D(p1, z2) / 2 + D(p2, z1) / 2
+        L = D(p2, z1)
+
         return {'loss': L}
 
 

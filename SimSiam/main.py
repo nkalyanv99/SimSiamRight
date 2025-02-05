@@ -86,8 +86,9 @@ def main(device, args):
     DEBUG = False
     LABEL_RANGE = [0, 5] #Range of images is 0 to 5.
     AUGMENT_IMAGES = False
-    name = 'no_augment' if not AUGMENT_IMAGES else 'augment'
-    name += str(LABEL_RANGE[0]) + '_' + str(LABEL_RANGE[1]) 
+    # name = 'no_augment' if not AUGMENT_IMAGES else 'augment'
+    # name += str(LABEL_RANGE[0]) + '_' + str(LABEL_RANGE[1])
+    name = 'non_symmetric_loss'
 
     wandb.init(project="SimSiamRight", name=name, config=args, mode='disabled' if DEBUG else 'online')
 
