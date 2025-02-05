@@ -17,6 +17,59 @@ import wandb
 from custom_loader import create_dataloader
 import random
 
+def plot_images(images1, images2, labels, name):
+    import matplotlib.pyplot as plt
+    
+    # Take first 8 pairs of images
+    n = 8
+    images1 = images1[:n]
+    images2 = images2[:n]
+    labels = labels[:n]
+    
+    # Create a figure with n rows and 3 columns
+    fig, axes = plt.subplots(n, 3, figsize=(12, 4*n))
+    
+    # Define normalization constants
+    mean = torch.tensor([0.5, 0.5, 0.5]).view(3, 1, 1)
+    std = torch.tensor([0.5, 0.5, 0.5]).view(3, 1, 1)
+    
+    # For each row, plot image1, image2 and label
+    for i in range(n):
+        # Unnormalize images (multiply by std and add mean)
+        img1 = images1[i] * std + mean
+        img2 = images2[i] * std + mean
+        
+        # Convert tensors to numpy arrays and transpose to correct format (H,W,C)
+        img1 = img1.cpu().numpy().transpose(1,2,0)
+        img2 = img2.cpu().numpy().transpose(1,2,0)
+        
+        # Clip values to [0,1] range
+        img1 = np.clip(img1, 0, 1)
+        img2 = np.clip(img2, 0, 1)
+        
+        # Plot images and label
+        axes[i,0].imshow(img1)
+        axes[i,0].axis('off')
+        axes[i,0].set_title('Image 1')
+        
+        axes[i,1].imshow(img2)
+        axes[i,1].axis('off')
+        axes[i,1].set_title('Image 2')
+        
+        axes[i,2].text(0.5, 0.5, f'Label: {labels[i].item()}', 
+                      horizontalalignment='center',
+                      verticalalignment='center')
+        axes[i,2].axis('off')
+    
+    plt.tight_layout()
+    
+    # Create directory if it doesn't exist
+    os.makedirs('plots', exist_ok=True)
+    
+    # Save the figure with timestamp
+    plt.savefig(f'{name}_image_pairs.png')
+    plt.close()
+
 def set_seed(seed):
     """Set all random seeds for reproducibility"""
     random.seed(seed)
@@ -28,12 +81,16 @@ def set_seed(seed):
 
 def main(device, args):
     # Set random seed first thing in main
-    set_seed(args.seed if hasattr(args, 'seed') else 42)
+    set_seed(4)
     
     DEBUG = False
-    wandb.init(project="SimSiamRight", name='condition_label', config=args, mode='disabled' if DEBUG else 'online')
+    LABEL_RANGE = [0, 5] #Range of images is 0 to 5.
+    AUGMENT_IMAGES = False
+    name = 'no_augment' if not AUGMENT_IMAGES else 'augment'
+    name += str(LABEL_RANGE[0]) + '_' + str(LABEL_RANGE[1]) 
 
-    label_range = [0, 0]
+    wandb.init(project="SimSiamRight", name=name, config=args, mode='disabled' if DEBUG else 'online')
+
     args.model.name = 'simsiam_diffusion'
 
     train_loader = create_dataloader(
@@ -41,9 +98,9 @@ def main(device, args):
         batch_size=args.train.batch_size,
         shuffle=True,
         transform=get_aug(train=True, image_size=args.aug_kwargs['image_size'], name='simsiam_diffusion'),
-        augment_images=True,
+        augment_images=AUGMENT_IMAGES,
         num_workers=8,
-        range_of_images=label_range #Set as -1 to use all synthetic images. 
+        range_of_images=LABEL_RANGE #Set as -1 to use all synthetic images. 
     )
 
     memory_loader = torch.utils.data.DataLoader(
@@ -92,7 +149,7 @@ def main(device, args):
         
         local_progress=tqdm(train_loader, desc=f'Epoch {epoch}/{args.train.num_epochs}', disable=args.hide_progress)
         for idx, ((images1, images2), labels) in enumerate(local_progress):
-            labels = labels / (label_range[1] + 1) #Normalize labels to be between 0 and 1. 
+            labels = labels / (LABEL_RANGE[1] + 1) #Normalize labels to be between 0 and 1. 
             model.zero_grad()
             data_dict = model.forward(images1.to(device, non_blocking=True), images2.to(device, non_blocking=True), labels.to(device, non_blocking=True))
             loss = data_dict['loss'].mean() # ddp
